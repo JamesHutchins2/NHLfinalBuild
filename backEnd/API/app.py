@@ -26,8 +26,8 @@ database = 'NHLData'
 server = '{server_name}.database.windows.net,1433'.format(server_name=server_name)
 
 #define user and passoword
-username = ''
-password = ''
+username = 'CloudSA08e9b67c'
+password = 'MyMaskIsPurple1'
 
 #create connection object 
 connection_string = textwrap.dedent('''
@@ -105,7 +105,15 @@ FIND_PLAYER_byID = "SELECT * FROM players WHERE id=%s;"
 
 # ! querys to search stats data base by name and year (this will be used to get the stats for the player)
 
+# ! #############
+#here we will import all the player names to make the calls to db faster
 
+player_names = pd.read_csv("pn.csv")
+#split into first and last name
+player_names["first_name"] = player_names["Player"].apply(lambda x: x.split(" ")[0])
+player_names["last_name"] = player_names["Player"].apply(lambda x: x.split(" ")[1])
+
+# ! ################################### #############
 
 
 
@@ -119,17 +127,20 @@ connection: odbc.Connection = odbc.connect(connection_string)
 # ! ################################### #############
 
 # ? player (model data set) find player by name
+
 @app.post("/api/player")
 def get_player():
     name = request.get_json()["name"]
+    year = request.get_json()["year"]
     #query the database for the player
     cursor = connection.cursor()
-    cursor.execute("SELECT * FROM players WHERE name=%s", (name,))
+    #check the player and year
+    cursor.execute("SELECT * FROM stats WHERE name=%s AND year=%s", (name, year)) 
     player = cursor.fetchone()
     cursor.close()
 
     if(player == None):
-        return{"message": "player not found"}
+        return  None
     else:
         return {"player": player}
 
@@ -147,7 +158,27 @@ def add_players():
     cursor.close()
     return {"message": "player added successfully."}
 
+
+
+@app.post("/data/addBulk")
+def add_bulk():
+    #add an entire list of players to the database
+    data = request.get_json()
+    cursor = connection.cursor()
+    #create table if it does not exist
+    cursor.execute(CREATE_PLAYERS_MODEL_TABLE)
+    for player in data:
+        #check that player does not already exist
+        cursor.execute(FIND_PLAYER_byName, (player["name"],))
+        if(cursor.fetchone() == None):
+            cursor.execute(INSERT_PLAYER, (player["name"], player["games_played"], player["goals"], player["penalty_minutes"], player["position_D"], player["position_LW"], player["model_result"]))
+        else:
+            continue
+    connection.commit()
+    cursor.close()
+    return {"message": "players added successfully."}
 #method for getting all players
+
 @app.get("/api/allplayers")
 def get_all_players():
     cursor = connection.cursor()
@@ -159,38 +190,32 @@ def get_all_players():
 # ! ################################################
 import re 
 # ! ################################################
+
+
 #import nltk
 import nltk.tokenize as tk
+
+#this method is called to find a player by name and year
 def player_search_call(user_input):
     #parse user input to find player name
-    year = re.search(r'\d{4}', user_input).group()
-    print(year)
-    #query the db for each value until a response if given (name)
-    #we will be searching by name and year
+    try:
+        year = re.search(r'\d{4}', user_input).group()
+    except:
+        year = None
+    #player holds the player object
     player = None
+    #tokenize the user input
     words = tk.word_tokenize(user_input)
+    #loop through the words in the user input
     for word in words:
-        print(word)
         
-        player = get_player_stats(name=word, year=year)
-        if(player != None):
-            for i in range(0,11):
-                print(player[i])
-            return {
-                        "name": player[1],
-                        "Age": int(player[2]),
-                        "G": int(player[5]),
-                        "Tm":   player[3],
-                        "Pos": player[4],
-                        "GP": player[6],
-                        "A": player[7],
-                        "PTS": player[8],
-                        "plusMinus": int(player[9]),
-                        "PIM": int(player[10]),
-                        "year": int(player[11])
-
-                    }
-    return None
+        #search for word in player_names
+        if(word in player_names["first_name"].values or word in player_names["last_name"].values):
+            #if we find a match we call the get_player_stats method
+            player = get_player_stats(name=word, year=year)
+            if player == None:
+                return None
+            return player
 
     
 
@@ -210,6 +235,9 @@ def insert_stats():
     connection.commit()
     cursor.close()
     return {"message": "stats added successfully."}
+
+
+
 # get all data points from the stats table 
 @app.get("/api/stats/getAll")
 def get_all_stats():
@@ -218,41 +246,83 @@ def get_all_stats():
     stats = cursor.fetchall()
     cursor.close()
     return {"stats": stats}
-# * get specific player stats by name
 
+
+# * get specific player stats by name
 def get_player_stats(name, year):
-    year = int(year)
+    if year != None:
+        year = int(year)
+    else:
+        year = "all"
+
     name = name.lower()
     #query the database for the player
     cursor = connection.cursor()
     #fetch all the player stats than look for the name value using regex
-    cursor.execute("SELECT * FROM stats WHERE year=?", (year,))
-    stats = cursor.fetchall()
-    cursor.close()
-    player_stats = None
+    # * add REGEX pattern to search name faster 
+    if(year != "all"):
+        cursor.execute("SELECT * FROM stats WHERE year=?", (year,))
+        stats = cursor.fetchall()
+        cursor.close()
+        player_stats = []
 
-    for stat in stats:
-        #grab the name value from row
-        name_value = stat[1]
-        
-        #split it into a list of words
-        name_value = tk.word_tokenize(name_value)
-        
-        #loop through the list of words
-        for word in name_value:
-            word = word.lower()
-            #if the word matches the name we are looking for return the stats
-            if(word == name):
-                player_stats = stat
+        for stat in stats:
+            #grab the name value from row
+            name_value = stat[1]
             
+            #split it into a list of words
+            name_value = tk.word_tokenize(name_value)
+            
+            #loop through the list of words
+            for word in name_value:
+                word = word.lower()
+                #if the word matches the name we are looking for return the stats
+                if(word == name):
+                    player_stats.append(stat)
+                    #! return the stats
+                
 
-    if(player_stats == None):
-        return
+        if(player_stats == None):
+            return "player not found"
+        else:
+            print(player_stats)
+            return player_stats
     else:
-        return player_stats
+        print("no year-------------")
+        cursor.execute("SELECT * FROM stats")
+
+        stats = cursor.fetchall()
+        cursor.close()
+        player_stats = []
+
+        for stat in stats:
+            #grab the name value from row
+            name_value = stat[1]
+            
+            #split it into a list of words
+            name_value = tk.word_tokenize(name_value)
+            
+            #loop through the list of words
+            for word in name_value:
+                word = word.lower()
+                #if the word matches the name we are looking for return the stats
+                if(word == name):
+                    player_stats.append(stat)
+                    
+                
+
+        if(player_stats == None):
+            return "player not found"
+        else:
+            for stat in player_stats:
+                print(stat)
+            
+            return player_stats
+
+
 
 #* delete a player from the stats table 
-@app.post("/api/stats/deletePlayer")
+@app.post("/api/stats/delete")
 def delete_player_stats():
     name = request.get_json()["name"]
     cursor = connection.cursor()
@@ -293,19 +363,46 @@ def chat_bot():
     #get the message
     message = data["message"]
 
+    #check to see if the user wants to exit 
+
+    #parse message word by word
+    words = tk.word_tokenize(message)
+    #loop through the words
+    for word in words:
+        #if the word is exit or quit return a message to the user
+        if(word == "exit" or word == "quit"):
+            print("exit")
+            #init chat bot
+            bot.__init__()
+            return {
+                "response": "Goodbye",
+                "code": "exit"
+                }
+
     #get the identifier
     identifier = data["identifier"]
     input = [message, identifier]
     
     #convert the input if it is ment to be of type int to type in \
     if(identifier == "G" or identifier == "A" or identifier == "PTS" or identifier == "plusMinus" or identifier == "PIM" or identifier == "GP"):
-        input[0] = int(input[0])
+        try:
+            input[0] = int(input[0])
+            print("try")
+        except:
+            print("fail")
+            return {
+                "response": "Sorry, I didn't understand that. Please Enter a number.",
+                "code": identifier
+                }
     
     #error handling for invalid inputs 
     isValid = validate_input(input)
+
     if(isValid == False):
-        return {"message": "invalid input",
-                "code": identifier}
+        return {
+                "response": "Sorry, Something went wrong. Please try again.",
+                "code": identifier
+                }
 
     
 
@@ -314,6 +411,12 @@ def chat_bot():
 
     response = None
     #pass the data to the bot when the position is selected
+    #let's use Regex to grab the first letter of the msg
+    first = re.search(r"^[a-zA-Z]", message)
+    #convert to string
+    if(first != None):
+        first = first.group(0)
+        first = first.upper()
     if(identifier == "position"):
         if(message == "D"):
             input = ["1", "position_D"]
@@ -321,6 +424,16 @@ def chat_bot():
             input = ["0", "position_LW"]
             response = bot.initialize(input)
         elif(message == "LW"):
+            input = ["0", "position_D"]
+            response = bot.initialize(input)
+            input = ["1", "position_LW"]
+            response = bot.initialize(input)
+        elif(first == "D"):
+            input = ["1", "position_D"]
+            response = bot.initialize(input)
+            input = ["0", "position_LW"]
+            response = bot.initialize(input)
+        elif(first == "L"):
             input = ["0", "position_D"]
             response = bot.initialize(input)
             input = ["1", "position_LW"]
@@ -335,34 +448,58 @@ def chat_bot():
 
     awns = response[0]
     code = response[1]
-    print(code)
+    
     #handel player stats search
     if(code == 767):
-        print(awns)
+        
         player = player_search_call(awns)
-        if(player != None):
-            awns = player
-            # * parse out the player library into a string 
-            awns = "in %s, %s played %s games, had %s goals, %s assists, and %s points. His plus Minus score was, %s" % (player["year"], player["name"], player["GP"], player["G"], player["A"], player["PTS"], player["plusMinus"])
-            code = 400
+        if(player == None):
+            awns = "Sorry, Something went wrong. Please ask for player stats or to predict a player's draft position."
             bot.__init__()
-            return {
-            "response": awns,
-            "code": code
-            }
-        else:
-            awns = "Player not found"
             code = 401
             return {
-            "response": awns,
-            "code": code
+                "response": awns,
+                "code": code
             }
+        if(len(player) > 1):
+            response = []
+            for p in player:
+                response.append("in %s, %s played %s games, had %s goals, %s assists, and %s points. His plus Minus score was, %s.      " % (p[11], p[1], p[5], p[6], p[7], p[8], p[9]))
+                respone_string = ""
+                for r in response:
+                    respone_string += r + "     "
+            bot.__init__()
+            code = 400
+            return {
+                "response": respone_string,
+                "code": code
+                }
+        
+        elif(len(player) == 1):
+            response = "in %s, %s played %s games, had %s goals, %s assists, and %s points. His plus Minus score was, %s" % (player[0][11], player[0][1], player[0][5], player[0][6], player[0][7], player[0][8], player[0][9])
+            bot.__init__()
+            code = 400
+            return {
+                "response": response,
+                "code": code
+                }
+        else:
+                # ! change this 
+                awns = "Sorry, Something went wrong. Please ask for player stats or to predict a player's draft position."
+                bot.__init__()
+                code = 401
+                return {
+                "response": awns,
+                "code": code
+                }
+
+        
     
     
 
     #check for if the code is Positon_d or Position_LW
     if(code == "position_D" or code == "position_LW"):
-        awns = "Please Entre the position of a player \n C: centre \n LW: left wing \n RW: right wing \n D: defence \n"
+        awns = "Please Entre the position of "+bot.predictionKnowns["name"]+", C: centre,  LW: left wing, RW: right wing, D: defence"
         code = "position"
 
 
@@ -438,12 +575,3 @@ def validate_input(data):
 
         
 
-#!things to fix 
-
-#1. fix init method it is not re setting the bot completely (should be working now)
-
-#2. fix the position method it is not working properly (working)
-
-#3. add db to get stats methods 
-
-#!
