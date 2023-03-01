@@ -26,8 +26,8 @@ database = 'NHLData'
 server = '{server_name}.database.windows.net,1433'.format(server_name=server_name)
 
 #define user and passoword
-username = 'CloudSA08e9b67c'
-password = 'MyMaskIsPurple1'
+username = ''
+password = ''
 
 #create connection object 
 connection_string = textwrap.dedent('''

@@ -156,7 +156,14 @@ class ChatBot:
             "com_mlp_prediction_prob": com_mlp_prediction_prob,
             "predictionProb":prediction_message
             }
-        returnSting = "the rf model predicts that " + name + " has a " + str(rf_prediction_prob) + "chance of being drafted." + "the svm model predicts that " + name + " has a " + str(svm_prediction_prob) + "%" + " chance of being drafted." + "the dtree model predicts that " + name + " has a " + str(dtree_prediction_prob) + "%"+ " chance of being drafted." + "the lr model predicts that " + name + " has a " + str(lr_prediction_prob) + "%"+" chance of being drafted." + "the simple mlp model predicts that " + name + " has a " + str(sim_mlp_prediction_prob) + "%"+" chance of being drafted." + "the complex mlp model predicts that " + name + " has a " + str(com_mlp_prediction_prob) + "%"+" chance of being drafted."
+        string1 = "The Support Vector Machine Classifier with Bagging predicts there is a "+ str(svm_prediction_prob) + " probability that "+name+" will be drafted in the 1st round of the NHL  "
+        string2 = "The Decision Tree Classifier with Bagging predicts there is a "+str(dtree_prediction_prob) +" probability that "+name+" will be drafted in the 1st round of the NHL   "
+        string3 = "The Logistic Regression Classifier with Bagging predicts there is a "+str(lr_prediction_prob)+" probability that "+name+" will be drafted in the 1st round of the NHL "
+        string4 = "The Simple MLP Deep Learning Classifier predicts there is a "+ str(sim_mlp_prediction_prob)+" probability that "+name+" will be drafted in the 1st round of the NHL   "
+        string5 = "The Complex MLP Deep Learning Classifier predicts there is a "+str(com_mlp_prediction_prob)+" probability that "+name+" will be drafted in the 1st round of the NHL   "
+        average = (rf_prediction_prob+svm_prediction_prob+dtree_prediction_prob+lr_prediction_prob+sim_mlp_prediction_prob+com_mlp_prediction_prob)/6
+        string6 = "Overall, we predict that there is a "+str(average)+" probability that "+name+" will be drafted in the first round."
+        returnSting = string1 + string2 + string3 + string4 + string5 + string6
         return returnSting
     #add app.py to path
     

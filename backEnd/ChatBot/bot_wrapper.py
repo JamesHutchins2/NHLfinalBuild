@@ -33,6 +33,7 @@ class BotWrapper:
     intentState = -1
     predictionKnowns = {}
     predictionCall = None
+    
 
     #define constructor
     def __init__(self):
@@ -80,6 +81,7 @@ class BotWrapper:
             message = response["response"]
             self.outputs.append(message)
             index = response["intent"]
+            print("index: " + "------------------------------")
 
             if index == -1:
                 #log the output 
@@ -94,9 +96,10 @@ class BotWrapper:
         #IN THE CASE THAT THE BOT DETERMINES THE USER WANTS PLAYER STATS
         if self.intentState == 0:
 
-            
+            print("hello 0 ")
             #we will call the function with this user input
             stats_response = self.bot.get_stats_call(user_input)
+            print("hello 1 ")
             
             #define the message
             message = stats_response
@@ -115,28 +118,12 @@ class BotWrapper:
 
         else:
             #405 is the error code for the intent state not being found
-            return 405
+            return ['Im sorry I dont understand', '405']
 
         
 
     def predictionCall(self, userInput, inputClass):
-        #we will need a series of inputs from the user to complete this proccess
-        #to determine what is required we will use the prediction knowns list
-        # * (name,G,A,GP,PIM,position_D,position_LW)
-        #self.predictionKnowns = {
-        #    "name": None,
-        #    "G": None,
-        #    "A": None,
-        #    "GP": None,
-        #    "PIM": None,
-        #   "position_D" : None,
-        #    "position_LW" : None
-        #}
-        #we will take the user input now and place it into the prediction knowns list
-        # ! we will have to take an array input with an indicator of what we have received 
-        # ! as a result we will have to first look at what data type has been given
-
-        # make a switch case that takes the input class and then places the input into the correct spot
+        #this method will be used to make a prediction
         # * (name,G,A,GP,PIM,position_D,position_LW)
         if inputClass == "name":
             #we have received the name of the player
@@ -168,23 +155,23 @@ class BotWrapper:
         
         if self.predictionKnowns["G"] == None:
             #we need to get the number of goals
-            return ["How many goals did the player score?", "G"] 
+            return ["How many goals did "+ self.predictionKnowns["name"] + " score?", "G"] 
         
         if self.predictionKnowns["A"] == None:
             #we need to get the number of assists
-            return ["How many assists did the player have?", "A"]
+            return ["How many assists did the "+self.predictionKnowns["name"]+" have?", "A"]
         
         if self.predictionKnowns["GP"] == None:
             #we need to get the number of games played
-            return ["How many games did the player play?", "GP"]
+            return ["How many games did the "+self.predictionKnowns["name"]+" play?", "GP"]
         
         if self.predictionKnowns["PIM"] == None:
             #we need to get the number of penalty minutes
-            return ["How many penalty minutes did the player have?", "PIM"]
+            return ["How many penalty minutes did "+self.predictionKnowns["name"]+" have?", "PIM"]
         
         if self.predictionKnowns["position_D"] == None:
             #we need to get the position of the player
-            return ["Does the player play defence?", "position_D"]
+            return ["Does "+self.predictionKnowns["name"]+" play defence?", "position_D"]
         
         if self.predictionKnowns["position_LW"] == None:
             #we need to get the position of the player
@@ -206,5 +193,5 @@ class BotWrapper:
         return [botPredictions, 400]
 
 
-#lets try to make a chatbot
+
 
