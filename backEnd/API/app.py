@@ -342,7 +342,7 @@ def chat_bot_init():
    bot.__init__()
    
    
-   return {"message": "bot initialized successfully."}
+   return {"message": "Thankyou goodbye!"}
 
 
 
